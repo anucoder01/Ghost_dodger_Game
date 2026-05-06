@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ghost Dodger Game</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom, #111, #333);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #startScreen, #gameOverScreen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      animation: fadeIn 1s ease;
+    }
+
+    #startScreen.active, #gameOverScreen.active {
+      display: flex;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #ff4081;
+      color: white;
+      font-weight: bold;
+      transition: transform 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    #gameCanvas {
+      background: black;
+      border: 2px solid white;
+      display: none;
+    }
+
+    #pauseOverlay {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-size: 2rem;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .powerup {
+      color: gold;
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen" class="active">
+    <h1>👻 Ghost Dodger</h1>
+    <p>Select Difficulty</p>
+    <div>
+      <button onclick="startGame('easy')">Easy 😌</button>
+      <button onclick="startGame('medium')">Medium 😬</button>
+      <button onclick="startGame('hard')">Hard 😈</button>
+    </div>
+    <p>Select Skin:</p>
+    <div>
+      <button onclick="setPlayerEmoji('🧙‍♂️')">🧙‍♂️</button>
+      <button onclick="setPlayerEmoji('🧛‍♂️')">🧛‍♂️</button>
+      <button onclick="setPlayerEmoji('🧟‍♂️')">🧟‍♂️</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="pauseOverlay">⏸️ Paused</div>
+
+  <div id="gameOverScreen">
+    <h2>Game Over! 💀</h2>
+    <p id="scoreDisplay"></p>
+    <p id="highScoreDisplay"></p>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const startScreen = document.getElementById("startScreen");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const pauseOverlay = document.getElementById("pauseOverlay");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const highScoreDisplay = document.getElementById("highScoreDisplay");
+
+    let player = { x: 180, y: 550, width: 40, height: 40, emoji: '🧙‍♂️', shield: false };
+    let ghosts = [];
+    let powerups = [];
+    let keys = {};
+    let gameLoop, spawnLoop, timerLoop, powerupLoop;
+    let speed = 2;
+    let difficulty = 'easy';
+    let survivalTime = 0;
+    let paused = false;
+
+    function drawEmoji(x, y, emoji) {
+      ctx.font = "32px Arial";
+      ctx.fillText(emoji, x, y);
+    }
+
+    function drawPlayer() {
+      drawEmoji(player.x, player.y, player.emoji);
+    }
+
+    function drawGhosts() {
+      ghosts.forEach(g => drawEmoji(g.x, g.y, g.emoji));
+    }
+
+    function drawPowerups() {
+      powerups.forEach(p => drawEmoji(p.x, p.y, p.emoji));
+    }
+
+    function updateGhosts() {
+      ghosts.forEach(g => g.y += g.speed);
+      ghosts = ghosts.filter(g => g.y < canvas.height);
+    }
+
+    function updatePowerups() {
+      powerups.forEach(p => p.y += 2);
+      powerups = powerups.filter(p => p.y < canvas.height);
+    }
+
+    function spawnGhost() {
+      const x = Math.random() * (canvas.width - 30);
+      ghosts.push({ x, y: -30, speed, emoji: '👾' });
+    }
+
+    function spawnPowerup() {
+      const x = Math.random() * (canvas.width - 30);
+      const type = Math.random() > 0.5 ? 'shield' : 'slow';
+      const emoji = type === 'shield' ? '🛡️' : '🐢';
+      powerups.push({ x, y: -30, type, emoji });
+    }
+
+    function checkCollision() {
+      return ghosts.some(g =>
+        g.y + 30 > player.y &&
+        g.x < player.x + player.width &&
+        g.x + 30 > player.x
+      );
+    }
+
+    function checkPowerupCollision() {
+      powerups.forEach((p, index) => {
+        if (
+          p.y + 30 > player.y &&
+          p.x < player.x + player.width &&
+          p.x + 30 > player.x
+        ) {
+          if (p.type === 'shield') {
+            player.shield = true;
+            setTimeout(() => player.shield = false, 5000);
+          } else if (p.type === 'slow') {
+            speed = Math.max(1, speed - 1);
+            setTimeout(() => speed += 1, 5000);
+          }
+          powerups.splice(index, 1);
+        }
+      });
+    }
+
+    function handleKeys() {
+      if (keys['ArrowLeft']) player.x -= 5;
+      if (keys['ArrowRight']) player.x += 5;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    }
+
+    function gameTick() {
+      if (paused) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      handleKeys();
+      updateGhosts();
+      updatePowerups();
+      drawPlayer();
+      drawGhosts();
+      drawPowerups();
+      checkPowerupCollision();
+
+      if (checkCollision()) {
+        if (player.shield) {
+          ghosts = ghosts.filter(g =>
+            !(g.y + 30 > player.y && g.x < player.x + player.width && g.x + 30 > player.x)
+          );
+        } else {
+          endGame();
+        }
+      }
+    }
+
+    function setPlayerEmoji(emoji) {
+      player.emoji = emoji;
+    }
+
+    function startGame(selectedDifficulty) {
+      difficulty = selectedDifficulty;
+      if (difficulty === 'easy') speed = 2;
+      if (difficulty === 'medium') speed = 3;
+      if (difficulty === 'hard') speed = 4;
+
+      survivalTime = 0;
+      player.x = 180;
+      player.shield = false;
+      ghosts = [];
+      powerups = [];
+      paused = false;
+
+      startScreen.classList.remove('active');
+      canvas.style.display = 'block';
+      pauseOverlay.style.display = 'none';
+
+      document.addEventListener('keydown', (e) => {
+        keys[e.key] = true;
+        if (e.key === 'Escape') togglePause();
+      });
+      document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+      gameLoop = setInterval(gameTick, 30);
+      spawnLoop = setInterval(spawnGhost, 800);
+      powerupLoop = setInterval(spawnPowerup, 10000);
+      timerLoop = setInterval(() => {
+        if (!paused) {
+          survivalTime++;
+          if (survivalTime % 5 === 0) speed += 0.5;
+        }
+      }, 1000);
+    }
+
+    function togglePause() {
+      paused = !paused;
+      pauseOverlay.style.display = paused ? 'flex' : 'none';
+    }
+
+    function endGame() {
+      clearInterval(gameLoop);
+      clearInterval(spawnLoop);
+      clearInterval(timerLoop);
+      clearInterval(powerupLoop);
+      canvas.style.display = 'none';
+      pauseOverlay.style.display = 'none';
+      gameOverScreen.classList.add('active');
+
+      scoreDisplay.textContent = `⏱ You survived for ${survivalTime} seconds.`;
+
+      let best = localStorage.getItem('ghostDodgerHighScore') || 0;
+      if (survivalTime > best) {
+        best = survivalTime;
+        localStorage.setItem('ghostDodgerHighScore', best);
+      }
+      highScoreDisplay.textContent = `🏆 High Score: ${best} seconds`;
+    }
+
+    function restartGame() {
+      gameOverScreen.classList.remove('active');
+      startScreen.classList.add('active');
+    }
+  </script>
+</body>
+</html>
+
