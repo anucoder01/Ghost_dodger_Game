@@ -12,18 +12,23 @@ When compared to other browser games or heavy standalone titles, Ghost Dodger st
 
 - **Zero Dependencies & Zero Installation:** Unlike games built with heavy engines (Unity, Unreal) or complex JS frameworks (React, Phaser), Ghost Dodger is purely Vanilla. No `npm install`, no complex build steps, and no downloading large executables.
 - **Blazing Fast Load Times:** With a microscopic footprint (under 10KB total), the game loads instantly on any internet connection. No loading screens, just instant gameplay.
-- **Privacy First (Local Storage):** Your high scores are saved locally on your device. There are no accounts to create, no servers tracking your behavior, and absolutely no intrusive ads or microtransactions.
+- **Privacy First (Local Storage):** Your high scores and collected coins are saved locally on your device. There are no accounts to create, no servers tracking your behavior, and absolutely no intrusive ads or microtransactions.
+- **Offline Playability (PWA):** Install the game on your device as a Progressive Web App and play it anytime, anywhere, even without an internet connection.
 - **Clean & Educational Codebase:** The entire game runs from a single HTML file with elegantly structured JavaScript. It serves as a perfect learning resource for developers wanting to understand game loops, collision detection, and HTML5 Canvas mechanics.
-- **Cross-Platform Accessibility:** Works seamlessly on any modern operating system (Windows, macOS, Linux) with a web browser.
+- **Cross-Platform Accessibility:** Works seamlessly on any modern operating system (Windows, macOS, Linux, iOS, Android) with a web browser.
 
 ---
 
 ## ✨ Key Features
 
-- **Dynamic Difficulty Scaling:** The challenge ramps up dynamically. Every 5 seconds you survive, the game speed increases, ensuring that the gameplay remains constantly engaging and tests your reflexes.
+- **Atmospheric Level System:** Survive through progressive, 2-minute timed levels featuring dynamic canvas backgrounds—from a bright day to a dramatic thunderstorm with animated rain and lightning, and finally a starry night sky.
+- **Evolving Enemy Types:** Face new challenges as you level up! Start with normal falling ghosts, progress to swaying **Zig-Zag Ghosts** (👻), and try to outrun aggressive **Chaser Ghosts** (💀) that track your movements.
+- **Coin Collection:** Gather golden coins (🪙) that drop from the sky. Your total wealth is persistently saved across sessions, giving you a fun long-term goal.
+- **Dynamic Difficulty Scaling:** The challenge ramps up dynamically. The game speed steadily increases the longer you survive.
 - **Interactive Powerup System:** It's not just about dodging! Strategic items drop from the sky to help you survive:
-  - 🛡️ **Shield (Invincibility):** Grants temporary immunity against ghost collisions for 5 seconds.
+  - 🛡️ **Shield (Invincibility):** Grants a glowing blue forcefield aura and temporary immunity against ghost collisions for 5 seconds.
   - 🐢 **Slow Motion:** Temporarily reduces the speed of the falling ghosts for 5 seconds, giving you a chance to reposition.
+- **Score Sharing:** Boast to your friends by easily sharing your high score and difficulty level using the native Share Score button at the end of a round.
 - **Multiple Selectable Difficulties:** Choose between Easy, Medium, and Hard right from the start menu to tailor the initial ghost speed to your skill level.
 - **Character Customization:** Personalize your playthrough by choosing from fun emoji-based skins: Play as a Wizard (🧙‍♂️), Vampire (🧛‍♂️), or Zombie (🧟‍♂️).
 - **Persistent High Score Tracking:** Your best survival time is permanently recorded in your browser's local storage, giving you a continuous target to beat.
@@ -46,7 +51,7 @@ Getting the game running on your machine is incredibly simple.
 
 1. **Clone or Download** this repository to your local machine.
 2. Navigate to the project folder.
-3. Simply **double-click** the `Index.html` file to open it in your preferred modern web browser (Chrome, Firefox, Edge, Safari).
+3. Simply open the `Index.html` file in your preferred modern web browser. *(Note: To test the PWA Offline functionality specifically, you will need to serve the folder via a local web server, e.g., `python -m http.server 8000`).*
 4. *That's it!* Select your difficulty, choose a skin, and start dodging!
 
 ---
@@ -55,9 +60,10 @@ Getting the game running on your machine is incredibly simple.
 
 Ghost Dodger was crafted to be as lightweight and native as possible:
 
-- **HTML5 (Canvas API):** Provides the foundational structure and the high-performance rendering context for the game loop and sprites.
+- **HTML5 (Canvas API):** Provides the foundational structure and the high-performance rendering context for the game loop, sprites, and dynamic weather backgrounds.
 - **CSS3:** Used for the sleek UI overlays, modern gradients, typography, and smooth CSS animations (like the fade-in screens).
 - **Vanilla JavaScript (ES6+):** Drives the core game loop, entity management, collision detection algorithms, event handling, and HTML5 `localStorage` integration.
+- **Service Workers:** Powers the Progressive Web App (PWA) capabilities, allowing the game to cache assets and be played entirely offline.
 
 ---
 ## 🤝 Contributing
