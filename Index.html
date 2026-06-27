@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ghost Dodger Game</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111111" />
   <style>
     * { box-sizing: border-box; }
     body {
@@ -77,11 +79,36 @@
     .powerup {
       color: gold;
     }
+
+    #toast {
+      visibility: hidden;
+      min-width: 200px;
+      margin-left: -100px;
+      background-color: #333;
+      border: 1px solid #555;
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 12px;
+      position: fixed;
+      z-index: 3;
+      left: 50%;
+      bottom: 30px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.5s, visibility 0.5s;
+    }
+
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
   <div id="startScreen" class="active">
     <h1>👻 Ghost Dodger</h1>
+    <p id="totalCoinsDisplay" style="color: gold; font-weight: bold;">Total Coins: 0 🪙</p>
     <p>Select Difficulty</p>
     <div>
       <button onclick="startGame('easy')">Easy 😌</button>
@@ -103,8 +130,14 @@
     <h2>Game Over! 💀</h2>
     <p id="scoreDisplay"></p>
     <p id="highScoreDisplay"></p>
-    <button onclick="restartGame()">Restart</button>
+    <p id="sessionCoinsDisplay" style="color: gold;"></p>
+    <div style="display: flex; gap: 10px;">
+      <button onclick="restartGame()">Restart</button>
+      <button onclick="shareScore()">Share Score 🔗</button>
+    </div>
   </div>
+
+  <div id="toast">Score copied to clipboard!</div>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
@@ -114,16 +147,31 @@
     const pauseOverlay = document.getElementById("pauseOverlay");
     const scoreDisplay = document.getElementById("scoreDisplay");
     const highScoreDisplay = document.getElementById("highScoreDisplay");
+    const totalCoinsDisplay = document.getElementById("totalCoinsDisplay");
+    const sessionCoinsDisplay = document.getElementById("sessionCoinsDisplay");
 
     let player = { x: 180, y: 550, width: 40, height: 40, emoji: '🧙‍♂️', shield: false };
     let ghosts = [];
     let powerups = [];
+    let coins = [];
     let keys = {};
-    let gameLoop, spawnLoop, timerLoop, powerupLoop;
+    let gameLoop, spawnLoop, timerLoop, powerupLoop, coinLoop;
     let speed = 2;
     let difficulty = 'easy';
     let survivalTime = 0;
     let paused = false;
+    let level = 1;
+    let sessionCoins = 0;
+    let totalCoins = parseInt(localStorage.getItem('ghostDodgerTotalCoins')) || 0;
+    totalCoinsDisplay.textContent = `Total Coins: ${totalCoins} 🪙`;
+
+    let levelTimeLeft = 120;
+    let isTransitioning = false;
+    let rainParticles = [];
+    let stars = [];
+    for(let i=0; i<50; i++) {
+      stars.push({x: Math.random()*400, y: Math.random()*600, radius: Math.random()*1.5});
+    }
 
     function drawEmoji(x, y, emoji) {
       ctx.font = "32px Arial";
@@ -131,6 +179,16 @@
     }
 
     function drawPlayer() {
+      if (player.shield) {
+        ctx.beginPath();
+        ctx.arc(player.x + 16, player.y - 10, 25, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 200, 255, 0.4)";
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(0, 200, 255, 0.8)";
+        ctx.stroke();
+        ctx.closePath();
+      }
       drawEmoji(player.x, player.y, player.emoji);
     }
 
@@ -142,9 +200,89 @@
       powerups.forEach(p => drawEmoji(p.x, p.y, p.emoji));
     }
 
+    function drawCoins() {
+      coins.forEach(c => drawEmoji(c.x, c.y, '🪙'));
+    }
+
+    function drawBackground() {
+      if (level === 1 || level > 3) {
+        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "#87ceeb");
+        grad.addColorStop(1, "#e0f6ff");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (level === 2) {
+        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "#2c3e50");
+        grad.addColorStop(1, "#34495e");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        if (Math.random() < 0.3) {
+          rainParticles.push({x: Math.random()*canvas.width, y: -10, speedY: 10 + Math.random()*5, speedX: -1 + Math.random()*2});
+        }
+        rainParticles.forEach((p, i) => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+          ctx.fillRect(p.x, p.y, 2, 10);
+          if (p.y > canvas.height) rainParticles.splice(i, 1);
+        });
+        
+        if (Math.random() < 0.01) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      } else if (level === 3) {
+        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "#0b0b2a");
+        grad.addColorStop(1, "#000000");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "white";
+        stars.forEach(s => {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    function drawHUD() {
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      if(level === 2 || level === 3) ctx.fillStyle = "white";
+      ctx.fillText(`Lvl: ${level}`, 10, 30);
+      ctx.fillText(`${levelTimeLeft}s`, 10, 60);
+      ctx.fillStyle = "gold";
+      ctx.fillText(`Coins: ${sessionCoins} 🪙`, canvas.width - 130, 30);
+      
+      if (isTransitioning) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.font = "bold 40px Arial";
+        ctx.fillText(`LEVEL ${level}`, canvas.width/2 - 80, canvas.height/2);
+      }
+    }
+
     function updateGhosts() {
-      ghosts.forEach(g => g.y += g.speed);
+      ghosts.forEach(g => {
+        g.y += g.speed;
+        if (g.type === 'zigzag') {
+          g.x += Math.sin(g.y / 20) * 2;
+        } else if (g.type === 'chaser') {
+          if (g.x < player.x) g.x += 1.5;
+          if (g.x > player.x) g.x -= 1.5;
+        }
+      });
       ghosts = ghosts.filter(g => g.y < canvas.height);
+    }
+
+    function updateCoins() {
+      coins.forEach(c => c.y += 3);
+      coins = coins.filter(c => c.y < canvas.height);
     }
 
     function updatePowerups() {
@@ -153,11 +291,31 @@
     }
 
     function spawnGhost() {
+      if (isTransitioning) return;
       const x = Math.random() * (canvas.width - 30);
-      ghosts.push({ x, y: -30, speed, emoji: '👾' });
+      let type = 'normal';
+      let emoji = '👾';
+      
+      if (level >= 2 && Math.random() > 0.6) {
+        type = 'zigzag';
+        emoji = '👻';
+      }
+      if (level >= 3 && Math.random() > 0.7) {
+        type = 'chaser';
+        emoji = '💀';
+      }
+      
+      ghosts.push({ x, y: -30, speed, type, emoji });
+    }
+
+    function spawnCoin() {
+      if (isTransitioning) return;
+      const x = Math.random() * (canvas.width - 30);
+      coins.push({ x, y: -30 });
     }
 
     function spawnPowerup() {
+      if (isTransitioning) return;
       const x = Math.random() * (canvas.width - 30);
       const type = Math.random() > 0.5 ? 'shield' : 'slow';
       const emoji = type === 'shield' ? '🛡️' : '🐢';
@@ -191,6 +349,19 @@
       });
     }
 
+    function checkCoinCollision() {
+      coins.forEach((c, index) => {
+        if (
+          c.y + 30 > player.y &&
+          c.x < player.x + player.width &&
+          c.x + 30 > player.x
+        ) {
+          sessionCoins++;
+          coins.splice(index, 1);
+        }
+      });
+    }
+
     function handleKeys() {
       if (keys['ArrowLeft']) player.x -= 5;
       if (keys['ArrowRight']) player.x += 5;
@@ -198,16 +369,37 @@
       if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     }
 
+    function triggerLevelTransition() {
+      isTransitioning = true;
+      level++;
+      ghosts = [];
+      coins = [];
+      powerups = [];
+      speed += 1;
+      setTimeout(() => {
+        levelTimeLeft = 120;
+        isTransitioning = false;
+      }, 2000);
+    }
+
     function gameTick() {
       if (paused) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      if (isTransitioning) {
+        drawHUD();
+        return;
+      }
       handleKeys();
       updateGhosts();
       updatePowerups();
+      updateCoins();
       drawPlayer();
       drawGhosts();
       drawPowerups();
+      drawCoins();
+      drawHUD();
       checkPowerupCollision();
+      checkCoinCollision();
 
       if (checkCollision()) {
         if (player.shield) {
@@ -231,10 +423,15 @@
       if (difficulty === 'hard') speed = 4;
 
       survivalTime = 0;
+      level = 1;
+      levelTimeLeft = 120;
+      isTransitioning = false;
+      sessionCoins = 0;
       player.x = 180;
       player.shield = false;
       ghosts = [];
       powerups = [];
+      coins = [];
       paused = false;
 
       startScreen.classList.remove('active');
@@ -250,10 +447,16 @@
       gameLoop = setInterval(gameTick, 30);
       spawnLoop = setInterval(spawnGhost, 800);
       powerupLoop = setInterval(spawnPowerup, 10000);
+      coinLoop = setInterval(spawnCoin, 3000);
       timerLoop = setInterval(() => {
-        if (!paused) {
+        if (!paused && !isTransitioning) {
           survivalTime++;
-          if (survivalTime % 5 === 0) speed += 0.5;
+          levelTimeLeft--;
+          if (levelTimeLeft <= 0) {
+            triggerLevelTransition();
+          } else if (survivalTime % 10 === 0) {
+            speed += 0.5;
+          }
         }
       }, 1000);
     }
@@ -268,11 +471,17 @@
       clearInterval(spawnLoop);
       clearInterval(timerLoop);
       clearInterval(powerupLoop);
+      clearInterval(coinLoop);
       canvas.style.display = 'none';
       pauseOverlay.style.display = 'none';
       gameOverScreen.classList.add('active');
 
-      scoreDisplay.textContent = `⏱ You survived for ${survivalTime} seconds.`;
+      scoreDisplay.textContent = `⏱ You survived for ${survivalTime} seconds. (Level ${level})`;
+      sessionCoinsDisplay.textContent = `Coins Collected: ${sessionCoins} 🪙`;
+
+      totalCoins += sessionCoins;
+      localStorage.setItem('ghostDodgerTotalCoins', totalCoins);
+      totalCoinsDisplay.textContent = `Total Coins: ${totalCoins} 🪙`;
 
       let best = localStorage.getItem('ghostDodgerHighScore') || 0;
       if (survivalTime > best) {
@@ -285,6 +494,32 @@
     function restartGame() {
       gameOverScreen.classList.remove('active');
       startScreen.classList.add('active');
+    }
+
+    function shareScore() {
+      const diffEmoji = difficulty === 'hard' ? '😈' : difficulty === 'medium' ? '😬' : '😌';
+      const text = `Ghost Dodger 👻 | Score: ${survivalTime}s | Difficulty: ${difficulty} ${diffEmoji} | Can you beat me?`;
+      
+      if (navigator.share) {
+        navigator.share({
+          title: 'Ghost Dodger Score',
+          text: text
+        }).catch(err => console.error('Share failed:', err));
+      } else {
+        navigator.clipboard.writeText(text).then(() => {
+          const toast = document.getElementById("toast");
+          toast.className = "show";
+          setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        });
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.error('ServiceWorker registration failed:', err);
+        });
+      });
     }
   </script>
 </body>
