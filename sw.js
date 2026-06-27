@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ghost-dodger-v5';
+const CACHE_NAME = 'ghost-dodger-v7';
 const ASSETS_TO_CACHE = [
   './',
   './Index.html',
